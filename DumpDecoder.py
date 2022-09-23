@@ -19,21 +19,37 @@ class LidarPoints(Package):
             count+=1
             pass
 
+class LidarVideo():
+    def __init__(self, file="target2800.pcap", frameQuantites=1, radius_limit=500, intensity_limit=20):
+        self.frames = []
+        self.file = file
+        self.dumpPtr = DumpFromPcapDecoder(self.file)
+        for i in range(0,frameQuantites,1):
+            self.frames.append(LidarFrame(file=self.file,dumpPtr=self.dumpPtr,radius_limit=radius_limit,intensity_limit=intensity_limit))
+            self.frames[-1].ReadDumpToFrame()
+
 class LidarFrame():
-    def __init__(self,file="target2800.pcap",frameNum=1):
+    def __init__(self,dumpPtr=None,file="target2800.pcap",frameNum=1,radius_limit=500,intensity_limit=20):
         self.packets = []
         self.PACKET_NUM = 630
         self.FILENAME = file
-        self.pcapFile = DumpFromPcapDecoder(self.FILENAME)
+        self.ReadPcapAsDumpPtr(dumpPtr=dumpPtr)
         self.files = self.pcapFile.payloads
         self.file = self.files[0]
         self.pcapFile.paylod = self.files[0]
         self.frameId = frameNum-1
+        self.radiusLimit = radius_limit
+        self.intensity = intensity_limit
+    def ReadPcapAsDumpPtr(self,dumpPtr):
+        if type(dumpPtr) == DumpFromPcapDecoder:
+            self.pcapFile = dumpPtr
+        else:
+            self.pcapFile = DumpFromPcapDecoder(self.FILENAME)
     def ReadDumpToFrame(self):
-        for i in range(self.frameId*630,self.frameId*630+630):
+        for i in range(self.frameId*self.PACKET_NUM,self.frameId*self.PACKET_NUM+630):
             file = self.files[i]
             self.pcapFile.payload = file
-            packet = LidarPackage(radius_limit=500,intensity_limit=20,fileIn=self.pcapFile)
+            packet = LidarPackage(radius_limit=self.radiusLimit,intensity_limit=self.intensity,fileIn=self.pcapFile)
             packet.readDump()
             if packet.blocks != [] or packet.blocks != None:
                 self.packets.append(ctypes.cast(id(packet),ctypes.py_object).value)
@@ -179,15 +195,17 @@ def testBench(x,y,z,intensity):
     plt.show()
 
 if __name__ == "__main__":
-    a = LidarFrame(file="target2800.pcap")
-    a.ReadDumpToFrame()
+    #a = LidarFrame(file="target2800.pcap")
+    #a.ReadDumpToFrame()
     #a = LidarPackage(radius_limit=1000,intensity_limit=50)
     #a.readDump(filePath="../RawLidarBin/RawLidarBin75.dump")
+    a = LidarVideo(file="target2800.pcap",frameQuantites=150,radius_limit=50,intensity_limit=200)
     x = []
     y = []
     z = []
     i = []
-    for packet in a.packets:
+    a1 = a.frames[0]
+    for packet in a1.packets:
         for block in packet.blocks:
             for point in block.points:
                 print(point.radius,"\t",point.intensity,'\t',point.elevation,'\t',point.azimuth,'\t',point.x_cord,'\t',point.y_cord,'\t',point.z_cord)
